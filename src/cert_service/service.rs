@@ -170,10 +170,11 @@ impl CertificateServiceImpl {
         let server_cert_pem = pem::encode(&pem::Pem::new("CERTIFICATE", server_cert_der));
         let server_key_pem = server_kp.serialize_pem();
 
-        let cert_chain = format!("{}\n{}", server_cert_pem.trim(), ca_cert_pem_str.trim());
+        // 02 - bug, do not include CA cert in chain for now
+        //let cert_chain = format!("{}\n{}", server_cert_pem.trim(), ca_cert_pem_str.trim());
 
         Ok((
-            cert_chain,
+            server_cert_pem, //cert_chain,
             server_key_pem,
             not_before.timestamp(),
             not_after.timestamp(),
