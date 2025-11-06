@@ -51,14 +51,14 @@ cargo build --release
 ### Build Docker image
 
 ```bash
-docker build -t csi-cert-driver:latest .
+docker build -t cacsi-driver:latest .
 ```
 
 ### Push to registry
 
 ```bash
-docker tag csi-cert-driver:latest your-registry/csi-cert-driver:latest
-docker push your-registry/csi-cert-driver:latest
+docker tag cacsi-driver:latest your-registry/cacsi-driver:latest
+docker push your-registry/cacsi-driver:latest
 ```
 
 ## Deployment
@@ -71,11 +71,11 @@ openssl req -x509 -newkey rsa:4096 -keyout ca.key -out ca.crt \
   -days 3650 -nodes -subj "/CN=CSI-CA"
 
 # Create Kubernetes secret
-kubectl create namespace csi-cert-system
+kubectl create namespace cacsi
 kubectl create secret tls csi-ca-secret \
   --cert=ca.crt \
   --key=ca.key \
-  -n csi-cert-system
+  -n cacsi
 ```
 
 ### 2. Deploy CSI Driver
@@ -89,23 +89,23 @@ kubectl apply -f deploy/csi-driver.yaml
 
 ```bash
 # Check certificate service
-kubectl get pods -n csi-cert-system -l app=cert-service
+kubectl get pods -n cacsi -l app=cacsi-service
 
 # Check CSI driver on nodes
-kubectl get pods -n csi-cert-system -l app=csi-cert-driver
+kubectl get pods -n cacsi -l app=cacsi-driver
 
 # Check CSI driver registration
-kubectl get csidriver csi.k8s.cert-driver
+kubectl get csidriver csi.k8s.cacsi-driver
 ```
 
 ### 4. Re-release 
 
 ```bash
 # rollout csi drivers
-kubectl rollout restart daemonset/csi-cert-driver -n csi-cert-system
+kubectl rollout restart daemonset/cacsi-driver -n cacsi
 
 # rollout service
-kubectl rollout restart deployment/cert-service -n csi-cert-system
+kubectl rollout restart deployment/cacsi-service -n cacsi
 ```
 
 ## Usage
@@ -129,7 +129,7 @@ spec:
   volumes:
     - name: certs
       csi:
-        driver: csi.k8s.cert-driver
+        driver: csi.k8s.cacsi-driver
 ```
 
 The certificates will be available at:
@@ -158,7 +158,7 @@ Example: `default-my-app-volume-12345`
 
 - `CSI_ENDPOINT`: Unix socket path (default: `unix:///csi/csi.sock`)
 - `NODE_ID`: Node identifier (default: hostname)
-- `CERT_SERVICE_ADDR`: Certificate service address (default: `http://cert-service:50051`)
+- `CERT_SERVICE_ADDR`: Certificate service address (default: `http://cacsi-service:50051`)
 - `CA_SECRET_NAME`: CA secret name (default: `csi-ca-secret`)
 - `CA_SECRET_NAMESPACE`: CA secret namespace (default: `kube-system`)
 - `CERT_BASE_PATH`: Base path for certificate storage (default: `/var/lib/csi-certs`)
@@ -197,13 +197,13 @@ Example: `default-my-app-volume-12345`
 ### Check certificate service logs
 
 ```bash
-kubectl logs -n csi-cert-system -l app=cert-service
+kubectl logs -n cacsi -l app=cacsi-service
 ```
 
 ### Check CSI driver logs
 
 ```bash
-kubectl logs -n csi-cert-system -l app=csi-cert-driver -c csi-driver
+kubectl logs -n cacsi -l app=cacsi-driver -c csi-driver
 ```
 
 ### View issued certificates
@@ -216,17 +216,17 @@ Certificates are tracked in the certificate service's in-memory database and mon
 
 1. Check CSI driver is running on the node:
    ```bash
-   kubectl get pods -n csi-cert-system -o wide
+   kubectl get pods -n cacsi -o wide
    ```
 
 2. Check driver logs:
    ```bash
-   kubectl logs -n csi-cert-system <csi-driver-pod> -c csi-driver
+   kubectl logs -n cacsi <cacsi-driver-pod> -c csi-driver
    ```
 
 3. Verify CA secret exists:
    ```bash
-   kubectl get secret csi-ca-secret -n csi-cert-system
+   kubectl get secret csi-ca-secret -n cacsi
    ```
 
 ### Certificate not renewing
@@ -271,7 +271,7 @@ For development, you can run the components locally (requires kubeconfig):
 
 ```bash
 # Run certificate service
-RUST_LOG=debug cargo run --bin cert-service
+RUST_LOG=debug cargo run --bin cacsi-service
 
 # Run CSI driver (requires root for socket creation)
 sudo RUST_LOG=debug cargo run --bin csi-driver

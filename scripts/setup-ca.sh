@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-NAMESPACE="csi-cert-system"
+NAMESPACE="cacsi"
 CA_SECRET="csi-ca-secret"
 
 echo "Generating CA Certificate for CSI Driver..."

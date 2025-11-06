@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
             .to_string_lossy()
             .to_string());
     let cert_service_addr = env::var("CERT_SERVICE_ADDR")
-        .unwrap_or_else(|_| "http://cert-service:50051".to_string());
+        .unwrap_or_else(|_| "http://cacsi-service:50051".to_string());
     let ca_secret_name = env::var("CA_SECRET_NAME")
         .unwrap_or_else(|_| "csi-ca-secret".to_string());
     let ca_secret_namespace = env::var("CA_SECRET_NAMESPACE")
