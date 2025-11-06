@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sandbox
+---
+# Test the CSI driver with a simple busybox pod
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-cert-volume
+  namespace: sandbox
+spec:
+  containers:
+    - name: test
+      image: busybox:latest
+      command:
+        - sleep
+        - "3600"
+      volumeMounts:
+        - name: certs
+          mountPath: /certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cert-driver
+---
+# After pod starts, verify certificates with:
+# kubectl exec test-cert-volume -n sandbox -- ls -la /certs
+# kubectl exec test-cert-volume -n sandbox -- cat /certs/tls.crt
+# kubectl exec test-cert-volume -n sandbox -- cat /certs/tls.key

@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sandbox
+---
+# Example Pod using the CSI driver for ephemeral certificate volume
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-app
+  namespace: sandbox
+spec:
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+      # The certificates will be available at:
+      # /etc/certs/tls.crt
+      # /etc/certs/tls.key
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cert-driver
+        volumeAttributes:
+          # Optional: custom attributes can be added here
+          validity_days: "7"

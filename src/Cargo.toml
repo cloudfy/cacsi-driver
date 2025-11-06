@@ -1,0 +1,62 @@
+[package]
+name = "k8s-csi-cert-driver"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# gRPC and Protobuf
+tonic = "0.11"
+prost = "0.12"
+tokio = { version = "1.35", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+
+# Certificate management
+rcgen = { version = "0.14.5", features = ["pem", "x509-parser"] }
+x509-parser = "0.16"
+rustls = "0.22"
+rustls-pemfile = "2.0"
+pem = "3.0"
+base64 = "0.22"
+
+# Kubernetes client
+kube = { version = "0.88", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.21", features = ["v1_28"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Async utilities
+futures = "0.3"
+async-trait = "0.1"
+
+# Time management
+chrono = "0.4"
+time = { version = "0.3", features = ["macros"] }
+
+# Data structures
+dashmap = "5.5"
+uuid = { version = "1.6", features = ["v4"] }
+
+# System
+hostname = "0.3"
+rustls-pki-types = "1.0"
+
+[build-dependencies]
+tonic-build = { version = "0.11", features = ["prost"] }
+
+[[bin]]
+name = "csi-driver"
+path = "main.rs"
+
+[[bin]]
+name = "cert-service"
+path = "cert_service/main.rs"

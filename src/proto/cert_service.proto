@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package certservice.v1;
+
+service CertificateService {
+  // Issue a new certificate
+  rpc IssueCertificate(IssueCertificateRequest) returns (IssueCertificateResponse) {}
+  
+  // Renew an existing certificate
+  rpc RenewCertificate(RenewCertificateRequest) returns (RenewCertificateResponse) {}
+  
+  // Revoke a certificate
+  rpc RevokeCertificate(RevokeCertificateRequest) returns (RevokeCertificateResponse) {}
+  
+  // Get certificate info
+  rpc GetCertificateInfo(GetCertificateInfoRequest) returns (GetCertificateInfoResponse) {}
+}
+
+message IssueCertificateRequest {
+  string certificate_id = 1;
+  string common_name = 2;
+  repeated string dns_names = 3;
+  repeated string ip_addresses = 4;
+  int64 validity_days = 5;
+  map<string, string> metadata = 6;
+}
+
+message IssueCertificateResponse {
+  string certificate_pem = 1;
+  string private_key_pem = 2;
+  string certificate_id = 3;
+  int64 not_before = 4;
+  int64 not_after = 5;
+}
+
+message RenewCertificateRequest {
+  string certificate_id = 1;
+  int64 validity_days = 2;
+}
+
+message RenewCertificateResponse {
+  string certificate_pem = 1;
+  string private_key_pem = 2;
+  int64 not_before = 3;
+  int64 not_after = 4;
+}
+
+message RevokeCertificateRequest {
+  string certificate_id = 1;
+}
+
+message RevokeCertificateResponse {
+  bool success = 1;
+}
+
+message GetCertificateInfoRequest {
+  string certificate_id = 1;
+}
+
+message GetCertificateInfoResponse {
+  string certificate_id = 1;
+  string common_name = 2;
+  repeated string dns_names = 3;
+  int64 not_before = 4;
+  int64 not_after = 5;
+  bool is_valid = 6;
+  map<string, string> metadata = 7;
+}
