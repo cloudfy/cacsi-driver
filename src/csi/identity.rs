@@ -6,7 +6,7 @@ use crate::proto::csi::{
     ProbeRequest, ProbeResponse,
 };
 
-const PLUGIN_NAME: &str = "csi.k8s.cert-driver";
+const PLUGIN_NAME: &str = "csi.k8s.cacsi-driver";
 const PLUGIN_VERSION: &str = "0.1.0";
 
 pub struct IdentityService {}

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-IMAGE_NAME=${1:-"csi-cert-driver:latest"}
+IMAGE_NAME=${1:-"cacsi-driver:latest"}
 REGISTRY=${2:-""}
 
 if [ -n "$REGISTRY" ]; then
@@ -26,7 +26,7 @@ fi
 
 # Update deployment with image
 echo "Updating deployment manifests..."
-sed -i.bak "s|image: csi-cert-driver:latest|image: $FULL_IMAGE|g" deploy/csi-driver.yaml
+sed -i.bak "s|image: cacsi-driver:latest|image: $FULL_IMAGE|g" deploy/csi-driver.yaml
 
 # Deploy to Kubernetes
 echo "Deploying to Kubernetes..."
@@ -39,8 +39,8 @@ echo ""
 echo "Deployment complete!"
 echo ""
 echo "To check status:"
-echo "  kubectl get pods -n csi-cert-system"
+echo "  kubectl get pods -n cacsi"
 echo ""
 echo "To view logs:"
-echo "  kubectl logs -n csi-cert-system -l app=cert-service"
-echo "  kubectl logs -n csi-cert-system -l app=csi-cert-driver -c csi-driver"
+echo "  kubectl logs -n cacsi -l app=cacsi-service"
+echo "  kubectl logs -n cacsi -l app=cacsi-driver -c csi-driver"

@@ -1,5 +1,5 @@
 [package]
-name = "k8s-csi-cert-driver"
+name = "cacsi-driver"
 version = "0.1.0"
 edition = "2021"
 
@@ -58,5 +58,5 @@ name = "csi-driver"
 path = "main.rs"
 
 [[bin]]
-name = "cert-service"
+name = "cacsi-service"
 path = "cert_service/main.rs"

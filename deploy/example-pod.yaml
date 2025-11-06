@@ -23,7 +23,7 @@ spec:
   volumes:
     - name: certs
       csi:
-        driver: csi.k8s.cert-driver
+        driver: csi.k8s.cacsi-driver
         volumeAttributes:
           # Optional: custom attributes can be added here
           validity_days: "7"

@@ -2,20 +2,20 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: csi-cert-system
+  name: cacsi
 ---
 # Service Account for CSI Driver
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: csi-cert-driver
-  namespace: csi-cert-system
+  name: cacsi-driver
+  namespace: cacsi
 ---
 # ClusterRole for CSI Driver
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: csi-cert-driver
+  name: cacsi-driver
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -34,29 +34,29 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: csi-cert-driver
+  name: cacsi-driver
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: csi-cert-driver
+  name: cacsi-driver
 subjects:
   - kind: ServiceAccount
-    name: csi-cert-driver
-    namespace: csi-cert-system
+    name: cacsi-driver
+    namespace: cacsi
 ---
 # CA Certificate Secret (to be created manually or via cert-manager)
 apiVersion: v1
 kind: Secret
 metadata:
   name: csi-ca-secret
-  namespace: csi-cert-system
+  namespace: cacsi
 type: kubernetes.io/tls
 data:
   # Base64 encoded CA certificate and key
   # These should be generated externally and applied
   # Example generation:
   # openssl req -x509 -newkey rsa:4096 -keyout ca.key -out ca.crt -days 3650 -nodes -subj "/CN=CSI-CA"
-  # kubectl create secret tls csi-ca-secret --cert=ca.crt --key=ca.key -n csi-cert-system
+  # kubectl create secret tls csi-ca-secret --cert=ca.crt --key=ca.key -n cacsi
   tls.crt: ""
   tls.key: ""
 ---
@@ -64,32 +64,32 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: cert-service
-  namespace: csi-cert-system
+  name: cacsi-service
+  namespace: cacsi
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: cert-service
+      app: cacsi-service
   template:
     metadata:
       labels:
-        app: cert-service
+        app: cacsi-service
     spec:
-      serviceAccountName: csi-cert-driver
+      serviceAccountName: cacsi-driver
       containers:
-        - name: cert-service
-          image: csi-cert-driver:latest  # Build and push your image
+        - name: cacsi-service
+          image: cacsi-driver:latest  # Build and push your image
           imagePullPolicy: IfNotPresent
           command:
-            - /usr/local/bin/cert-service
+            - /usr/local/bin/cacsi-service
           env:
             - name: LISTEN_ADDR
               value: "0.0.0.0:50051"
             - name: CA_SECRET_NAME
               value: "csi-ca-secret"
             - name: CA_SECRET_NAMESPACE
-              value: "csi-cert-system"
+              value: "cacsi"
             - name: RUST_LOG
               value: "info"
           ports:
@@ -108,11 +108,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: cert-service
-  namespace: csi-cert-system
+  name: cacsi-service
+  namespace: cacsi
 spec:
   selector:
-    app: cert-service
+    app: cacsi-service
   ports:
     - name: grpc
       port: 50051
@@ -124,23 +124,23 @@ spec:
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  name: csi-cert-driver
-  namespace: csi-cert-system
+  name: cacsi-driver
+  namespace: cacsi
 spec:
   selector:
     matchLabels:
-      app: csi-cert-driver
+      app: cacsi-driver
   template:
     metadata:
       labels:
-        app: csi-cert-driver
+        app: cacsi-driver
     spec:
-      serviceAccountName: csi-cert-driver
+      serviceAccountName: cacsi-driver
       hostNetwork: true
       dnsPolicy: ClusterFirstWithHostNet
       containers:
         - name: csi-driver
-          image: csi-cert-driver:latest  # Build and push your image
+          image: cacsi-driver:latest  # Build and push your image
           imagePullPolicy: IfNotPresent
           command:
             - /usr/local/bin/csi-driver
@@ -152,11 +152,11 @@ spec:
                 fieldRef:
                   fieldPath: spec.nodeName
             - name: CERT_SERVICE_ADDR
-              value: "http://cert-service.csi-cert-system.svc.cluster.local:50051"
+              value: "http://cacsi-service.cacsi.svc.cluster.local:50051"
             - name: CA_SECRET_NAME
               value: "csi-ca-secret"
             - name: CA_SECRET_NAMESPACE
-              value: "csi-cert-system"
+              value: "cacsi"
             - name: CERT_BASE_PATH
               value: "/var/lib/csi-certs"
             - name: CLUSTER_DOMAIN
@@ -185,7 +185,7 @@ spec:
           image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.0
           args:
             - "--csi-address=/csi/csi.sock"
-            - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.k8s.cert-driver/csi.sock"
+            - "--kubelet-registration-path=/var/lib/kubelet/plugins/csi.k8s.cacsi-driver/csi.sock"
             - "--v=5"
           volumeMounts:
             - name: plugin-dir
@@ -203,7 +203,7 @@ spec:
       volumes:
         - name: plugin-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/csi.k8s.cert-driver/
+            path: /var/lib/kubelet/plugins/csi.k8s.cacsi-driver/
             type: DirectoryOrCreate
         - name: registration-dir
           hostPath:
@@ -222,7 +222,7 @@ spec:
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: csi.k8s.cert-driver
+  name: csi.k8s.cacsi-driver
 spec:
   attachRequired: false
   podInfoOnMount: true

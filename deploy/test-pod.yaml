@@ -23,7 +23,7 @@ spec:
   volumes:
     - name: certs
       csi:
-        driver: csi.k8s.cert-driver
+        driver: csi.k8s.cacsi-driver
 ---
 # After pod starts, verify certificates with:
 # kubectl exec test-cert-volume -n sandbox -- ls -la /certs

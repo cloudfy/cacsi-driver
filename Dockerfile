@@ -42,13 +42,13 @@ RUN apt-get update && \
 
 # Copy binaries from builder
 COPY --from=builder /build/target/release/csi-driver /usr/local/bin/csi-driver
-COPY --from=builder /build/target/release/cert-service /usr/local/bin/cert-service
+COPY --from=builder /build/target/release/cacsi-service /usr/local/bin/cacsi-service
 
 # Create directories
 RUN mkdir -p /csi /var/lib/csi-certs
 
 # Set executable permissions
-RUN chmod +x /usr/local/bin/csi-driver /usr/local/bin/cert-service
+RUN chmod +x /usr/local/bin/csi-driver /usr/local/bin/cacsi-service
 
 # Default command
 CMD ["/usr/local/bin/csi-driver"]
