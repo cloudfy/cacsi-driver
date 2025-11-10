@@ -121,10 +121,22 @@ impl Node for NodeService {
             .map_err(|e| Status::internal(format!("Failed to create target path: {}", e)))?;
 
         // Extract validity_days from volume attributes (default: 7 days)
-        let validity_days = req.volume_context
-            .get("validity_days")
-            .and_then(|v| v.parse::<i64>().ok())
-            .unwrap_or(7);
+        let validity_days = match req.volume_context.get("validity_days") {
+            Some(v_str) => {
+                match v_str.parse::<i64>() {
+                    Ok(days) if days > 0 => days,
+                    Ok(days) => {
+                        error!("Invalid validity_days value (must be positive): {}", days);
+                        return Err(Status::invalid_argument(format!("validity_days must be a positive integer, got {}", days)));
+                    }
+                    Err(e) => {
+                        error!("Failed to parse validity_days '{}': {}", v_str, e);
+                        return Err(Status::invalid_argument(format!("validity_days must be a positive integer, got '{}'", v_str)));
+                    }
+                }
+            }
+            None => 7,
+        };
 
         // Request certificate from certificate service
         match self.cert_manager.issue_certificate(
