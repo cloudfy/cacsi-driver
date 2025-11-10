@@ -4,12 +4,14 @@ metadata:
   name: sandbox
 ---
 # Example Pod using the CSI driver for ephemeral certificate volume
+# This example uses the default CN format: pod-name.namespace.svc.cluster-domain
 apiVersion: v1
 kind: Pod
 metadata:
   name: example-app
   namespace: sandbox
 spec:
+  serviceAccountName: default
   containers:
     - name: app
       image: nginx:latest
@@ -25,5 +27,68 @@ spec:
       csi:
         driver: csi.k8s.cacsi-driver
         volumeAttributes:
-          # Optional: custom attributes can be added here
+          # Optional: certificate validity in days (default: 7)
           validity_days: "7"
+---
+# Example Pod with custom CN template using pod metadata
+# CN will be: example-app-with-template.sandbox
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-app-with-template
+  namespace: sandbox
+  labels:
+    app: nginx
+    environment: production
+spec:
+  serviceAccountName: nginx-sa
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          # Custom CN template using pod metadata
+          # Available fields:
+          #   metadata.name, metadata.namespace, metadata.uid
+          #   metadata.labels.<label-key>, metadata.annotations.<annotation-key>
+          #   spec.serviceAccountName, spec.nodeName, spec.hostname, spec.subdomain
+          cn_template: "{metadata.name}.{metadata.namespace}"
+          validity_days: "30"
+---
+# Example Pod with service account in CN
+# CN will be: nginx-sa.sandbox.svc.cluster.local
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-app-with-sa
+  namespace: sandbox
+spec:
+  serviceAccountName: nginx-sa
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          cn_template: "{spec.serviceAccountName}.{metadata.namespace}.svc.cluster.local"
+          validity_days: "14"
+---
+# Service Account for the example pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx-sa
+  namespace: sandbox

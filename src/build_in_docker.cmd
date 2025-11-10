@@ -1,1 +1,0 @@
-docker run --rm -v C:\Development\Workspace\k8s\src:/app -w /app rust:latest cargo build --release

@@ -46,6 +46,9 @@ time = { version = "0.3", features = ["macros"] }
 dashmap = "5.5"
 uuid = { version = "1.6", features = ["v4"] }
 
+# Text processing
+regex = "1.10"
+
 # System
 hostname = "0.3"
 rustls-pki-types = "1.0"

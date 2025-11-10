@@ -28,6 +28,10 @@ COPY src/proto ./proto
 COPY src/csi ./csi
 COPY src/cert_service ./cert_service
 
+# Note: *.rs in root already copied by the wildcard above, but being explicit:
+# This includes: main.rs, cert_manager.rs, ca_manager.rs, cert_monitor.rs, 
+# k8s_client.rs, template_parser.rs
+
 # Build the binaries
 RUN cargo build --release --bins
 
