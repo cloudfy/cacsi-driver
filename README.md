@@ -200,6 +200,7 @@ Templates use `{section.field}` syntax to reference pod information:
 - `{spec.nodeName}` - Node the pod is running on
 - `{spec.hostname}` - Pod hostname (if set)
 - `{spec.subdomain}` - Pod subdomain (if set)
+- `{spec.priorityClassName}` - Pod priority class name (if set)
 
 #### Template Examples
 
