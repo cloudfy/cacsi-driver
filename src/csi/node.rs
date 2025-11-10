@@ -16,12 +16,14 @@ use crate::proto::csi::{
 
 use crate::cert_manager::CertificateManager;
 use crate::ca_manager::CaManager;
+use crate::template_parser::TemplateParser;
 
 pub struct NodeService {
     node_id: String,
     cert_manager: CertificateManager,
     ca_manager: CaManager,
     cluster_domain: String,
+    template_parser: TemplateParser,
 }
 
 impl NodeService {
@@ -36,6 +38,7 @@ impl NodeService {
             cert_manager,
             ca_manager,
             cluster_domain,
+            template_parser: TemplateParser::default(),
         }
     }
 
@@ -88,18 +91,60 @@ impl Node for NodeService {
         // Generate certificate ID from pod info and volume ID
         let cert_id = format!("{}-{}-{}", pod_namespace, pod_name, req.volume_id);
 
+        // Determine the common name (CN) to use
+        let common_name = if let Some(cn_template) = req.volume_context.get("cn_template") {
+            // CN template is provided - resolve it using pod information
+            info!("Using CN template: {}", cn_template);
+            
+            // Fetch pod details from Kubernetes API
+            let client = crate::k8s_client::get_client()
+                .await
+                .map_err(|e| Status::internal(format!("Failed to get Kubernetes client: {}", e)))?;
+            
+            let (pod_metadata, pod_spec) = crate::k8s_client::get_pod_info(&client, &pod_namespace, &pod_name)
+                .await
+                .map_err(|e| Status::internal(format!("Failed to get pod info: {}", e)))?;
+            
+            // Resolve template
+            self.template_parser.resolve(cn_template, &pod_metadata, &pod_spec)
+                .map_err(|e| Status::invalid_argument(format!("Failed to resolve CN template: {}", e)))?
+        } else {
+            // Default CN format: pod-name.namespace.svc.cluster-domain
+            format!("{}.{}.svc.{}", pod_name, pod_namespace, self.cluster_domain)
+        };
+
+        info!("Certificate CN: {}", common_name);
+
         // Create target directory
         tokio::fs::create_dir_all(&req.target_path)
             .await
             .map_err(|e| Status::internal(format!("Failed to create target path: {}", e)))?;
 
+        // Extract validity_days from volume attributes (default: 7 days)
+        let validity_days = match req.volume_context.get("validity_days") {
+            Some(v_str) => {
+                match v_str.parse::<i64>() {
+                    Ok(days) if days > 0 => days,
+                    Ok(days) => {
+                        error!("Invalid validity_days value (must be positive): {}", days);
+                        return Err(Status::invalid_argument(format!("validity_days must be a positive integer, got {}", days)));
+                    }
+                    Err(e) => {
+                        error!("Failed to parse validity_days '{}': {}", v_str, e);
+                        return Err(Status::invalid_argument(format!("validity_days must be a positive integer, got '{}'", v_str)));
+                    }
+                }
+            }
+            None => 7,
+        };
+
         // Request certificate from certificate service
         match self.cert_manager.issue_certificate(
             &cert_id,
-            &format!("{}.{}.svc.{}", pod_name, pod_namespace, self.cluster_domain),
+            &common_name,
             vec![pod_name.clone()],
             vec![],
-            7, // 7 days validity
+            validity_days,
         ).await {
             Ok((cert_pem, key_pem, not_before, not_after)) => {
                 info!("Certificate issued for {}", cert_id);

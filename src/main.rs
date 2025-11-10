@@ -11,6 +11,7 @@ mod cert_manager;
 mod ca_manager;
 mod cert_monitor;
 mod k8s_client;
+mod template_parser;
 
 use csi::{identity::IdentityService, node::NodeService};
 use cert_monitor::CertificateMonitor;

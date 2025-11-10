@@ -130,6 +130,9 @@ spec:
     - name: certs
       csi:
         driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          # Optional: specify certificate validity in days (default: 7)
+          validity_days: "7"
 ```
 
 The certificates will be available at:
@@ -147,10 +150,83 @@ Example: `default-my-app-volume-12345`
 
 ### Certificate Properties
 
-- **Common Name**: `$POD_NAME.$POD_NAMESPACE.svc.$CLUSTER_DOMAIN`
+- **Common Name**: `$POD_NAME.$POD_NAMESPACE.svc.$CLUSTER_DOMAIN` (default)
 - **DNS SANs**: `$POD_NAME`
-- **Validity**: 7 days (default)
+- **Validity**: 7 days (default, configurable via `validity_days` attribute)
 - **Renewal**: Automatic when < 20% lifetime remains (~1.4 days before expiry)
+
+### Custom Common Name Template
+
+You can customize the certificate's Common Name (CN) using template syntax that references pod metadata and spec fields:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  serviceAccountName: my-service-account
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          # Custom CN template using pod metadata and spec
+          cn_template: "{spec.serviceAccountName}.{metadata.namespace}.svc.cluster.local"
+          validity_days: "30"
+```
+
+#### Template Syntax
+
+Templates use `{section.field}` syntax to reference pod information:
+
+**Available metadata fields:**
+- `{metadata.name}` - Pod name
+- `{metadata.namespace}` - Pod namespace
+- `{metadata.uid}` - Pod UID
+- `{metadata.labels.<label-key>}` - Specific label value
+- `{metadata.annotations.<annotation-key>}` - Specific annotation value
+
+**Available spec fields:**
+- `{spec.serviceAccountName}` - Service account name
+- `{spec.nodeName}` - Node the pod is running on
+- `{spec.hostname}` - Pod hostname (if set)
+- `{spec.subdomain}` - Pod subdomain (if set)
+- `{spec.priorityClassName}` - Pod priority class name (if set)
+
+#### Template Examples
+
+1. **Service Account Based CN:**
+   ```yaml
+   cn_template: "{spec.serviceAccountName}.{metadata.namespace}"
+   # Result: my-service-account.production
+   ```
+
+2. **Label-based CN:**
+   ```yaml
+   cn_template: "{metadata.labels.app}.{metadata.namespace}.svc.cluster.local"
+   # Result: nginx.production.svc.cluster.local
+   ```
+
+3. **Complex CN with multiple fields:**
+   ```yaml
+   cn_template: "{metadata.name}.{spec.serviceAccountName}.{metadata.namespace}"
+   # Result: my-app.my-service-account.production
+   ```
+
+#### Behavior
+
+- If `cn_template` is **not provided**, the default format is used: `{metadata.name}.{metadata.namespace}.svc.{cluster-domain}`
+- If a template field doesn't exist (e.g., pod has no `serviceAccountName`), the certificate issuance will fail with a clear error message
+- Templates are resolved at volume mount time using live pod information from the Kubernetes API
 
 ## Configuration
 
