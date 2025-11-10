@@ -59,7 +59,7 @@ impl CertificateManager {
             .await
             .context(format!("Failed to connect to certificate service at {}", addr))?;
 
-        // build request of certificate issuance
+        // Build request for certificate issuance
         let request = IssueCertificateRequest {
             certificate_id: cert_id.to_string(),
             common_name: common_name.to_string(),
