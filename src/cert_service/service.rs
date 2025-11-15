@@ -6,12 +6,13 @@ use k8s_openapi::api::core::v1::Secret;
 use rcgen::{
     CertificateParams, KeyPair,
     SanType, ExtendedKeyUsagePurpose,
-    KeyUsagePurpose, DnType, BasicConstraints,
+    KeyUsagePurpose, DnType,
 };
 use rustls_pki_types::CertificateDer;
 use std::sync::Arc;
 use tonic::{Request, Response, Status};
 use tracing::{info, error, debug};
+use x509_parser::prelude::{X509Certificate, FromDer};
 
 use super::proto::certservice::{
     certificate_service_server::CertificateService,
@@ -112,14 +113,27 @@ impl CertificateServiceImpl {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("CA certificate PEM not loaded"))?;
 
+        // Parse CA certificate to extract DN fields
+        let ca_pems = pem::parse_many(ca_cert_pem_str.as_bytes())
+            .map_err(|e| anyhow::anyhow!("Failed to parse CA cert PEM: {}", e))?;
+        let ca_cert_pem = ca_pems.into_iter().next()
+            .ok_or_else(|| anyhow::anyhow!("No certificate in PEM"))?;
+        let ca_cert_der = CertificateDer::from(ca_cert_pem.contents().to_vec());
+        
+        let (_, ca_cert) = X509Certificate::from_der(&ca_cert_der)
+            .map_err(|e| anyhow::anyhow!("Failed to parse CA certificate: {}", e))?;
+        
+        let ca_org = ca_cert.subject().iter_organization().next().and_then(|o| o.as_str().ok()).map(|s| s);
+        let ca_country = ca_cert.subject().iter_country().next().and_then(|c| c.as_str().ok()).map(|s| s);
+
         let server_kp = KeyPair::generate()
             .map_err(|e| anyhow::anyhow!("Failed to generate server key pair: {}", e))?;
 
         let mut server_params = CertificateParams::default();
 
         server_params.distinguished_name.push(DnType::CommonName, common_name);
-        server_params.distinguished_name.push(DnType::OrganizationName, "Kubernetes CSI");
-        server_params.distinguished_name.push(DnType::CountryName, "DK");
+        server_params.distinguished_name.push(DnType::OrganizationName, ca_org.unwrap_or("Kubernetes CSI"));
+        server_params.distinguished_name.push(DnType::CountryName, ca_country.unwrap_or("DK"));
 
         server_params.subject_alt_names = dns_names
             .iter()
@@ -155,11 +169,6 @@ impl CertificateServiceImpl {
         server_params.not_before = time::OffsetDateTime::from(not_before_system);
         server_params.not_after = time::OffsetDateTime::from(not_after_system);
 
-        // Parse CA certificate from PEM to create issuer
-        let ca_cert_pem = pem::parse(ca_cert_pem_str)
-            .map_err(|e| anyhow::anyhow!("Failed to parse CA cert PEM: {}", e))?;
-        let ca_cert_der = CertificateDer::from(ca_cert_pem.contents().to_vec());
-        
         // Sign the server certificate with the CA
         let ca_issuer = rcgen::Issuer::from_ca_cert_der(&ca_cert_der, ca_key)
             .map_err(|e| anyhow::anyhow!("Failed to create issuer from CA cert: {}", e))?;
