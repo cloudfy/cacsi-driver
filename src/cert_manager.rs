@@ -67,6 +67,7 @@ impl CertificateManager {
             ip_addresses,
             validity_days,
             metadata: std::collections::HashMap::new(),
+            organizational_units: vec![],
         };
 
         let response = client
