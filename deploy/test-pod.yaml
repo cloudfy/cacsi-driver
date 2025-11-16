@@ -24,8 +24,15 @@ spec:
     - name: certs
       csi:
         driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          # Optional: Add organizational units to the certificate
+          organizational_units: "Testing, Quality Assurance"
+          validity_days: "7"
 ---
 # After pod starts, verify certificates with:
 # kubectl exec test-cert-volume -n sandbox -- ls -la /certs
 # kubectl exec test-cert-volume -n sandbox -- cat /certs/tls.crt
 # kubectl exec test-cert-volume -n sandbox -- cat /certs/tls.key
+#
+# To inspect certificate details including organizational units:
+# kubectl exec test-cert-volume -n sandbox -- cat /certs/tls.crt | openssl x509 -text -noout

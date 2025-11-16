@@ -86,6 +86,57 @@ spec:
           cn_template: "{spec.serviceAccountName}.{metadata.namespace}.svc.cluster.local"
           validity_days: "14"
 ---
+# Example Pod with a single organizational unit
+# Certificate will include OU=Engineering
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-app-with-ou
+  namespace: sandbox
+spec:
+  serviceAccountName: nginx-sa
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          cn_template: "{metadata.name}.{metadata.namespace}"
+          organizational_units: "Engineering"
+          validity_days: "30"
+---
+# Example Pod with multiple organizational units
+# Certificate will include OU=Engineering, OU=Platform, OU=Security
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-app-with-multiple-ou
+  namespace: sandbox
+spec:
+  serviceAccountName: nginx-sa
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          cn_template: "{metadata.name}.{metadata.namespace}"
+          # Multiple OUs can be specified as comma-separated values
+          organizational_units: "Engineering, Platform, Security"
+          validity_days: "30"
+---
 # Service Account for the example pods
 apiVersion: v1
 kind: ServiceAccount

@@ -138,12 +138,29 @@ impl Node for NodeService {
             None => 7,
         };
 
+        // Extract organizational_units from volume attributes (optional, comma-separated)
+        let organizational_units = match req.volume_context.get("organizational_units") {
+            Some(ou_str) => {
+                ou_str
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<String>>()
+            }
+            None => vec![],
+        };
+
+        if !organizational_units.is_empty() {
+            info!("Organizational units: {:?}", organizational_units);
+        }
+
         // Request certificate from certificate service
         match self.cert_manager.issue_certificate(
             &cert_id,
             &common_name,
             vec![pod_name.clone()],
             vec![],
+            organizational_units,
             validity_days,
         ).await {
             Ok((cert_pem, key_pem, not_before, not_after)) => {

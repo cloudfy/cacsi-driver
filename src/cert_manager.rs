@@ -42,6 +42,7 @@ impl CertificateManager {
         common_name: &str,
         dns_names: Vec<String>,
         ip_addresses: Vec<String>,
+        organizational_units: Vec<String>,
         validity_days: i64,
     ) -> Result<(String, String, i64, i64)> {
         info!("Issuing certificate for: {}", cert_id);
@@ -67,6 +68,7 @@ impl CertificateManager {
             ip_addresses,
             validity_days,
             metadata: std::collections::HashMap::new(),
+            organizational_units,
         };
 
         let response = client

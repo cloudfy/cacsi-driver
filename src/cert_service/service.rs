@@ -27,6 +27,7 @@ struct CertificateRecord {
     certificate_id: String,
     common_name: String,
     dns_names: Vec<String>,
+    organizational_units: Vec<String>,
     not_before: i64,
     not_after: i64,
     metadata: std::collections::HashMap<String, String>,
@@ -101,6 +102,7 @@ impl CertificateServiceImpl {
         common_name: &str,
         dns_names: Vec<String>,
         ip_addresses: Vec<String>,
+        organizational_units: Vec<String>,
         validity_days: i64,
     ) -> Result<(String, String, i64, i64)> {
         let ca_key_lock = self.ca_key.read().await;
@@ -134,6 +136,11 @@ impl CertificateServiceImpl {
         server_params.distinguished_name.push(DnType::CommonName, common_name);
         server_params.distinguished_name.push(DnType::OrganizationName, ca_org.unwrap_or("Kubernetes CSI"));
         server_params.distinguished_name.push(DnType::CountryName, ca_country.unwrap_or("DK"));
+
+        // Add organizational units if provided
+        for ou in organizational_units {
+            server_params.distinguished_name.push(DnType::OrganizationalUnitName, ou);
+        }
 
         server_params.subject_alt_names = dns_names
             .iter()
@@ -202,12 +209,14 @@ impl CertificateService for CertificateServiceImpl {
         info!("Issuing certificate: {}", req.certificate_id);
         debug!("Common name: {}", req.common_name);
         debug!("DNS names: {:?}", req.dns_names);
+        debug!("Organizational units: {:?}", req.organizational_units);
 
         match self
             .generate_certificate(
                 &req.common_name,
                 req.dns_names.clone(),
                 req.ip_addresses.clone(),
+                req.organizational_units.clone(),
                 req.validity_days,
             )
             .await
@@ -217,6 +226,7 @@ impl CertificateService for CertificateServiceImpl {
                     certificate_id: req.certificate_id.clone(),
                     common_name: req.common_name.clone(),
                     dns_names: req.dns_names.clone(),
+                    organizational_units: req.organizational_units.clone(),
                     not_before,
                     not_after,
                     metadata: req.metadata.clone(),
@@ -258,6 +268,7 @@ impl CertificateService for CertificateServiceImpl {
 
         let common_name = existing.common_name.clone();
         let dns_names = existing.dns_names.clone();
+        let organizational_units = existing.organizational_units.clone();
         
         drop(existing);
 
@@ -266,6 +277,7 @@ impl CertificateService for CertificateServiceImpl {
                 &common_name,
                 dns_names.clone(),
                 vec![],
+                organizational_units.clone(),
                 req.validity_days,
             )
             .await
