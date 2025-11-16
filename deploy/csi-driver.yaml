@@ -29,6 +29,9 @@ rules:
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
 ---
 # ClusterRoleBinding for CSI Driver
 apiVersion: rbac.authorization.k8s.io/v1
