@@ -91,19 +91,26 @@ impl Node for NodeService {
         // Generate certificate ID from pod info and volume ID
         let cert_id = format!("{}-{}-{}", pod_namespace, pod_name, req.volume_id);
 
-        // Determine the common name (CN) to use
-        let common_name = if let Some(cn_template) = req.volume_context.get("cn_template") {
-            // CN template is provided - resolve it using pod information
-            info!("Using CN template: {}", cn_template);
-            
-            // Fetch pod details from Kubernetes API
+        // Fetch pod details from Kubernetes API once for all template resolution
+        let needs_pod_info = req.volume_context.get("cn_template").map(|t| self.template_parser.has_templates(t)).unwrap_or(false)
+            || req.volume_context.get("organizational_units").map(|ou| self.template_parser.has_templates(ou)).unwrap_or(false);
+        
+        let (pod_metadata, pod_spec) = if needs_pod_info {
             let client = crate::k8s_client::get_client()
                 .await
                 .map_err(|e| Status::internal(format!("Failed to get Kubernetes client: {}", e)))?;
             
-            let (pod_metadata, pod_spec) = crate::k8s_client::get_pod_info(&client, &pod_namespace, &pod_name)
+            crate::k8s_client::get_pod_info(&client, &pod_namespace, &pod_name)
                 .await
-                .map_err(|e| Status::internal(format!("Failed to get pod info: {}", e)))?;
+                .map_err(|e| Status::internal(format!("Failed to get pod info: {}", e)))?
+        } else {
+            (HashMap::new(), HashMap::new())
+        };
+
+        // Determine the common name (CN) to use
+        let common_name = if let Some(cn_template) = req.volume_context.get("cn_template") {
+            // CN template is provided - resolve it using pod information
+            info!("Using CN template: {}", cn_template);
             
             // Resolve template
             self.template_parser.resolve(cn_template, &pod_metadata, &pod_spec)
@@ -139,13 +146,57 @@ impl Node for NodeService {
         };
 
         // Extract organizational_units from volume attributes (optional, comma-separated)
+        // Format can be either:
+        // - Simple values: "IT, Engineering, Security"
+        // - Key-value pairs: "t:tenantid, e:environment, n:{metadata.namespace}"
+        // Template placeholders will be resolved
         let organizational_units = match req.volume_context.get("organizational_units") {
             Some(ou_str) => {
-                ou_str
-                    .split(',')
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty())
-                    .collect::<Vec<String>>()
+                // Parse each OU entry
+                let mut parsed_ous = Vec::new();
+                for ou_entry in ou_str.split(',') {
+                    let trimmed = ou_entry.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    
+                    // Check if this is a key-value pair (e.g., "t:tenantid" or "n:{metadata.namespace}")
+                    let ou_value = if let Some(colon_pos) = trimmed.find(':') {
+                        // Extract the value part after the colon
+                        let value_part = trimmed[colon_pos + 1..].trim();
+                        
+                        // Check if value contains templates and resolve them
+                        if self.template_parser.has_templates(value_part) {
+                            match self.template_parser.resolve(value_part, &pod_metadata, &pod_spec) {
+                                Ok(resolved) => resolved,
+                                Err(e) => {
+                                    error!("Failed to resolve OU template '{}': {}", value_part, e);
+                                    return Err(Status::invalid_argument(format!("Failed to resolve OU template '{}': {}", value_part, e)));
+                                }
+                            }
+                        } else {
+                            value_part.to_string()
+                        }
+                    } else {
+                        // No colon, treat as simple value
+                        // Check if it contains templates and resolve them
+                        if self.template_parser.has_templates(trimmed) {
+                            match self.template_parser.resolve(trimmed, &pod_metadata, &pod_spec) {
+                                Ok(resolved) => resolved,
+                                Err(e) => {
+                                    error!("Failed to resolve OU template '{}': {}", trimmed, e);
+                                    return Err(Status::invalid_argument(format!("Failed to resolve OU template '{}': {}", trimmed, e)));
+                                }
+                            }
+                        } else {
+                            trimmed.to_string()
+                        }
+                    };
+                    
+                    parsed_ous.push(ou_value);
+                }
+                
+                parsed_ous
             }
             None => vec![],
         };
