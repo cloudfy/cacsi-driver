@@ -160,37 +160,17 @@ impl Node for NodeService {
                         continue;
                     }
                     
-                    // Check if this is a key-value pair (e.g., "t:tenantid" or "n:{metadata.namespace}")
-                    let ou_value = if let Some(colon_pos) = trimmed.find(':') {
-                        // Extract the value part after the colon
-                        let value_part = trimmed[colon_pos + 1..].trim();
-                        
-                        // Check if value contains templates and resolve them
-                        if self.template_parser.has_templates(value_part) {
-                            match self.template_parser.resolve(value_part, &pod_metadata, &pod_spec) {
-                                Ok(resolved) => resolved,
-                                Err(e) => {
-                                    error!("Failed to resolve OU template '{}': {}", value_part, e);
-                                    return Err(Status::invalid_argument(format!("Failed to resolve OU template '{}': {}", value_part, e)));
-                                }
+                    // Resolve templates in the entire OU entry (preserving colon delimiters)
+                    let ou_value = if self.template_parser.has_templates(trimmed) {
+                        match self.template_parser.resolve(trimmed, &pod_metadata, &pod_spec) {
+                            Ok(resolved) => resolved,
+                            Err(e) => {
+                                error!("Failed to resolve OU template '{}': {}", trimmed, e);
+                                return Err(Status::invalid_argument(format!("Failed to resolve OU template '{}': {}", trimmed, e)));
                             }
-                        } else {
-                            value_part.to_string()
                         }
                     } else {
-                        // No colon, treat as simple value
-                        // Check if it contains templates and resolve them
-                        if self.template_parser.has_templates(trimmed) {
-                            match self.template_parser.resolve(trimmed, &pod_metadata, &pod_spec) {
-                                Ok(resolved) => resolved,
-                                Err(e) => {
-                                    error!("Failed to resolve OU template '{}': {}", trimmed, e);
-                                    return Err(Status::invalid_argument(format!("Failed to resolve OU template '{}': {}", trimmed, e)));
-                                }
-                            }
-                        } else {
-                            trimmed.to_string()
-                        }
+                        trimmed.to_string()
                     };
                     
                     parsed_ous.push(ou_value);
