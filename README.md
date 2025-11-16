@@ -152,6 +152,7 @@ Example: `default-my-app-volume-12345`
 
 - **Common Name**: `$POD_NAME.$POD_NAMESPACE.svc.$CLUSTER_DOMAIN` (default)
 - **DNS SANs**: `$POD_NAME`
+- **Organizational Units**: Optional, comma-separated list (configurable via `organizational_units` attribute)
 - **Validity**: 7 days (default, configurable via `validity_days` attribute)
 - **Renewal**: Automatic when < 20% lifetime remains (~1.4 days before expiry)
 
@@ -227,6 +228,54 @@ Templates use `{section.field}` syntax to reference pod information:
 - If `cn_template` is **not provided**, the default format is used: `{metadata.name}.{metadata.namespace}.svc.{cluster-domain}`
 - If a template field doesn't exist (e.g., pod has no `serviceAccountName`), the certificate issuance will fail with a clear error message
 - Templates are resolved at volume mount time using live pod information from the Kubernetes API
+
+### Organizational Units
+
+You can add one or more Organizational Units (OU) to your certificates using the `organizational_units` attribute:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+  namespace: production
+spec:
+  containers:
+    - name: app
+      image: nginx:latest
+      volumeMounts:
+        - name: certs
+          mountPath: /etc/certs
+          readOnly: true
+  volumes:
+    - name: certs
+      csi:
+        driver: csi.k8s.cacsi-driver
+        volumeAttributes:
+          # Single organizational unit
+          organizational_units: "Engineering"
+          validity_days: "30"
+```
+
+#### Multiple Organizational Units
+
+To specify multiple OUs, provide them as a comma-separated list:
+
+```yaml
+volumeAttributes:
+  # Multiple OUs will be added to the certificate in order
+  organizational_units: "Engineering, Platform, Security"
+  validity_days: "30"
+```
+
+#### Behavior
+
+- The `organizational_units` attribute is **optional** - certificates can be issued without OUs
+- Multiple OUs can be specified as comma-separated values
+- Leading and trailing whitespace is automatically trimmed from each OU
+- Empty OUs are ignored
+- OUs appear in the certificate's Distinguished Name in the order specified
+- To inspect OUs in the certificate, use: `openssl x509 -in tls.crt -text -noout`
 
 ## Configuration
 
