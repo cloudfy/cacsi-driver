@@ -4,9 +4,9 @@ use dashmap::DashMap;
 use kube::{Api, Client};
 use k8s_openapi::api::core::v1::Secret;
 use rcgen::{
-    CertificateParams, KeyPair,
+    CertificateParams, KeyPair, DistinguishedName,
     SanType, ExtendedKeyUsagePurpose,
-    KeyUsagePurpose, DnType,
+    KeyUsagePurpose, DnType, CustomExtension,
 };
 use rustls_pki_types::CertificateDer;
 use std::sync::Arc;
@@ -133,14 +133,27 @@ impl CertificateServiceImpl {
 
         let mut server_params = CertificateParams::default();
 
-        server_params.distinguished_name.push(DnType::CommonName, common_name);
-        server_params.distinguished_name.push(DnType::OrganizationName, ca_org.unwrap_or("Kubernetes CSI"));
+        // Build DN in standard X.509 order
         server_params.distinguished_name.push(DnType::CountryName, ca_country.unwrap_or("DK"));
-
-        // Add organizational units if provided
-        for ou in organizational_units {
-            server_params.distinguished_name.push(DnType::OrganizationalUnitName, ou);
+        server_params.distinguished_name.push(DnType::OrganizationName, ca_org.unwrap_or("Akuzo"));
+        
+        // Handle organizational units
+        // NOTE: rcgen 0.14 has a CRITICAL LIMITATION where DistinguishedName uses a BTreeMap<DnType, DnValue>,
+        // which fundamentally cannot store multiple values for the same key (DnType::OrganizationalUnitName).
+        //
+        // WORKAROUND: Join all OUs into a single OU field separated by " + "
+        // This is a valid X.509 DN representation where multiple values can be combined.
+        // Example: OU=t:tenantid + e:environment + n:sandbox
+        debug!("Processing {} organizational units", organizational_units.len());
+        
+        if !organizational_units.is_empty() {
+            let combined_ou = organizational_units.join(" + ");
+            debug!("Combined OUs into single field: '{}'", combined_ou);
+            server_params.distinguished_name.push(DnType::OrganizationalUnitName, combined_ou.as_str());
+            info!("Added combined OU with {} components: {}", organizational_units.len(), combined_ou);
         }
+        
+        server_params.distinguished_name.push(DnType::CommonName, common_name);
 
         server_params.subject_alt_names = dns_names
             .iter()
