@@ -4,7 +4,7 @@ use dashmap::DashMap;
 use kube::{Api, Client};
 use k8s_openapi::api::core::v1::Secret;
 use rcgen::{
-    CertificateParams, KeyPair,
+    CertificateParams, KeyPair, DistinguishedName,
     SanType, ExtendedKeyUsagePurpose,
     KeyUsagePurpose, DnType,
 };
@@ -133,14 +133,26 @@ impl CertificateServiceImpl {
 
         let mut server_params = CertificateParams::default();
 
-        server_params.distinguished_name.push(DnType::CommonName, common_name);
-        server_params.distinguished_name.push(DnType::OrganizationName, ca_org.unwrap_or("Kubernetes CSI"));
-        server_params.distinguished_name.push(DnType::CountryName, ca_country.unwrap_or("DK"));
-
-        // Add organizational units if provided
-        for ou in organizational_units {
-            server_params.distinguished_name.push(DnType::OrganizationalUnitName, ou);
+        // Build DN with multiple OUs by creating a new DistinguishedName
+        // rcgen 0.14 has limitations with multiple values of the same DnType
+        // Workaround: Build the DN using a custom string and parse it
+        let mut dn = DistinguishedName::new();
+        
+        // Add DN components in reverse order (rcgen reverses them internally)
+        dn.push(DnType::CommonName, common_name);
+        
+        // Add organizational units
+        debug!("Processing {} organizational units", organizational_units.len());
+        for (idx, ou) in organizational_units.iter().enumerate() {
+            debug!("Adding OU #{}: '{}'", idx + 1, ou);
+            dn.push(DnType::OrganizationalUnitName, ou.as_str());
         }
+        debug!("Total OUs requested: {}", organizational_units.len());
+        
+        dn.push(DnType::OrganizationName, ca_org.unwrap_or("Akuzo"));
+        dn.push(DnType::CountryName, ca_country.unwrap_or("DK"));
+        
+        server_params.distinguished_name = dn;
 
         server_params.subject_alt_names = dns_names
             .iter()

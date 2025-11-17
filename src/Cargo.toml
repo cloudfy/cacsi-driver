@@ -11,7 +11,7 @@ tokio = { version = "1.35", features = ["full"] }
 tokio-stream = { version = "0.1", features = ["net"] }
 
 # Certificate management
-rcgen = { version = "0.14.5", features = ["pem", "x509-parser"] }
+rcgen = { version = "0.14", features = ["pem", "x509-parser"] }
 x509-parser = "0.16"
 rustls = "0.22"
 rustls-pemfile = "2.0"
